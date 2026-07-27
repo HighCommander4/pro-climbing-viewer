@@ -1,0 +1,18 @@
+{
+   "content_scripts": [ {
+      "js": [ "content.js" ],
+      "matches": [ "https://www.youtube.com/watch*" ]
+   } ],
+   "description": "Zoom in on climbers during World Climbing semifinals using keys 1–4.",
+   "icons": {
+      "128": "images/logo128.png",
+      "16": "images/logo16.png",
+      "32": "images/logo32.png",
+      "48": "images/logo48.png"
+   },
+   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEArgFBYoOXYUxUuZO6h/5avmn/KINks/x5pcygoO8X/2iJJDGmYWWKrFnSYkjwqBHhQ1M3zzG0oQmM4B7GMPUooCuYmjv9RS1cqhefCu2ChBA4FjM4LYIsQIyHDnSHGtFGOZpYPW8b7iNaO61Ah58Cx2nlNbbG7PmlPKuJgpYiJ02kyUEOhzn3OLpxWA6XcBg9lJUACfZWtExyZhW4hYnA14se8QOCQaj5OvK3g8v6ZdMi0VboASWIdeqJfO0PQgv3xYsPhIsnhME4L8W9zLHZ7ucXMlJ1b772wjBciAd4angpCSABr/AcrWkFvb92rDNALypg/DHcv9uNvjppNZbvkwIDAQAB",
+   "manifest_version": 3,
+   "name": "Pro Climbing Viewer",
+   "update_url": "https://clients2.google.com/service/update2/crx",
+   "version": "1.1"
+}
