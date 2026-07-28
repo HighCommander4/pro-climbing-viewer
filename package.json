@@ -1,0 +1,14 @@
+{
+  "name": "pro-climbing-viewer",
+  "version": "1.1.0",
+  "description": "Zoom in on climbers during World Climbing semifinals using keys 1–4. (Firefox port)",
+  "private": true,
+  "scripts": {
+    "lint": "web-ext lint --ignore-files package.json package-lock.json",
+    "start:firefox": "web-ext run",
+    "build": "web-ext build --overwrite-dest --ignore-files package.json package-lock.json"
+  },
+  "devDependencies": {
+    "web-ext": "^8.0.0"
+  }
+}
