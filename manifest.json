@@ -10,9 +10,16 @@
       "32": "images/logo32.png",
       "48": "images/logo48.png"
    },
-   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEArgFBYoOXYUxUuZO6h/5avmn/KINks/x5pcygoO8X/2iJJDGmYWWKrFnSYkjwqBHhQ1M3zzG0oQmM4B7GMPUooCuYmjv9RS1cqhefCu2ChBA4FjM4LYIsQIyHDnSHGtFGOZpYPW8b7iNaO61Ah58Cx2nlNbbG7PmlPKuJgpYiJ02kyUEOhzn3OLpxWA6XcBg9lJUACfZWtExyZhW4hYnA14se8QOCQaj5OvK3g8v6ZdMi0VboASWIdeqJfO0PQgv3xYsPhIsnhME4L8W9zLHZ7ucXMlJ1b772wjBciAd4angpCSABr/AcrWkFvb92rDNALypg/DHcv9uNvjppNZbvkwIDAQAB",
    "manifest_version": 3,
    "name": "Pro Climbing Viewer",
-   "update_url": "https://clients2.google.com/service/update2/crx",
-   "version": "1.1"
+   "version": "1.1",
+   "browser_specific_settings": {
+      "gecko": {
+         "id": "{0cf0012d-877b-4e18-bb55-b33bb8fb2568}",
+         "strict_min_version": "109.0",
+         "data_collection_permissions": {
+            "required": [ "none" ]
+         }
+      }
+   }
 }
