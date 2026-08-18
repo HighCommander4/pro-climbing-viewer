@@ -4,11 +4,18 @@
   "license": "MIT",
   "private": true,
   "scripts": {
-    "lint": "web-ext lint --ignore-files package.json package-lock.json",
+    "lint": "web-ext lint",
     "start:firefox": "web-ext run",
-    "build": "web-ext build --overwrite-dest --ignore-files package.json package-lock.json",
-    "sign": "web-ext sign --channel unlisted --ignore-files package.json package-lock.json",
-    "publish": "web-ext sign --channel listed --ignore-files package.json package-lock.json"
+    "build": "web-ext build --overwrite-dest",
+    "sign": "web-ext sign --channel unlisted",
+    "publish": "web-ext sign --channel listed"
+  },
+  "webExt": {
+    "ignoreFiles": [
+      "package.json",
+      "package-lock.json",
+      "README.md"
+    ]
   },
   "devDependencies": {
     "web-ext": "^8.0.0"
