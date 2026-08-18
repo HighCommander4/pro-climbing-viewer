@@ -6,6 +6,22 @@ window.settings = {
   animations: true
   };
 
+// Regions A–D: the strip of per-boulder thumbnail feeds across the top of the
+// broadcast; pressing key 1–4 zooms into one of them. Coordinates are
+// normalized (0..1) fractions of the video element's box. Values taken from the
+// original Pro Climbing Viewer layout.
+window.regionA = { x: 0,                   y: 0.07, w: 0.18802083333333333, h: 0.18518518518518517 };
+window.regionB = { x: 0.18802083333333334, y: 0.07, w: 0.18802083333333333, h: 0.18518518518518517 };
+window.regionC = { x: 0.3760416667,         y: 0.07, w: 0.18802083333333333, h: 0.18518518518518517 };
+window.regionD = { x: 0.5640625,            y: 0.07, w: 0.18802083333333333, h: 0.18518518518518517 };
+
+// Region E: the large main-feed area, below the strip. When zoomed, the
+// selected thumbnail is composited into this region via a <canvas> overlay,
+// while the real video — including the thumbnail strip above E — keeps playing
+// underneath. Coordinates are normalized (0..1) fractions of the video
+// element's box; calibrate to the actual broadcast layout if needed.
+window.regionE = { x: 0, y: 0.31, w: 0.745, h: 0.69 };
+
 function addButton() {
   const rightControls = document.querySelector('.ytp-right-controls');
   if (!rightControls) return;
@@ -117,17 +133,11 @@ function toggleSettingsPanel() {
 }
 
 function resetZoom() {
-  const video = document.querySelector('video');
-  const overlay = window.overlay;
-
-  if (!video) return;
-
-  video.style.transform = 'none';
-
   window.isZoomed = false;
+  stopZoomLoop();
 
-  if (overlay) {
-    overlay.style.display = "block";
+  if (window.zoomCanvas) {
+    window.zoomCanvas.style.display = "none";
   }
 
   console.log("Zoom reset");
@@ -178,51 +188,23 @@ function init() {
   const video = document.querySelector('video');
   if (!video) return;
 
-  video.style.transformOrigin = "top left";
-  video.style.transition = window.settings.animations
-  ? "transform 300ms cubic-bezier(0.2, 0.8, 0.2, 1)"
-  : "none";
-
   const container = video.parentElement;
   container.style.position = "relative";
 
+  // Canvas overlay used to composite the zoomed region into area E. It lives in
+  // the same container as the video (so it stacks below the player chrome), is
+  // hidden until zoomed, and never intercepts pointer events.
+  const canvas = document.createElement('canvas');
+  canvas.id = "zoom-canvas";
+  canvas.style.position = "absolute";
+  canvas.style.pointerEvents = "none";
+  canvas.style.display = "none";
+  container.appendChild(canvas);
 
-  const overlay = document.createElement('div');
-  overlay.id = "zoom-overlay";
+  window.zoomCanvas = canvas;
+  window.zoomCtx = canvas.getContext('2d', { alpha: false, desynchronized: true });
 
-  overlay.style.position = "absolute";
-  overlay.style.inset = "0";
-  overlay.style.pointerEvents = "none";
-  overlay.style.display = "block";
-  overlay.style.zIndex = "9999";
-
-  container.appendChild(overlay);
-
-  window.overlay = overlay;
-  window.rects.push({
-    x: 0,
-    y: 0.07,
-    w: 0.18802083333333333,
-    h: 0.18518518518518517
-  });
-  window.rects.push({
-    x: 0.18802083333333334,
-    y: 0.07,
-    w: 0.18802083333333333,
-    h: 0.18518518518518517
-  });
-  window.rects.push({
-    x: 0.3760416667,
-    y: 0.07,
-    w: 0.18802083333333333,
-    h: 0.18518518518518517
-  });
-  window.rects.push({
-    x: 0.5640625,
-    y: 0.07,
-    w: 0.18802083333333333,
-    h: 0.18518518518518517
-  });
+  window.rects = [window.regionA, window.regionB, window.regionC, window.regionD];
 }
 
 
@@ -230,34 +212,120 @@ function init() {
 function applyZoom() {
   const video = document.querySelector('video');
   if (!video || window.rects.length === 0) return;
-
-  const active = window.rects[window.activeRectIndex];
-  if (!active) return;
+  if (!window.rects[window.activeRectIndex]) return;
 
   window.isZoomed = true;
 
-  const overlay = window.overlay;
-  if (overlay) overlay.style.display = "none";
+  if (window.zoomCanvas) window.zoomCanvas.style.display = "block";
 
+  startZoomLoop();
+
+  console.log("Zooming to:", window.activeRectIndex, window.rects[window.activeRectIndex]);
+}
+
+
+// Position/size the canvas over region E, in the video element's coordinate
+// space, and keep its backing store sized to the displayed pixels.
+function positionCanvasOverE(video, canvas) {
   const vw = video.clientWidth;
   const vh = video.clientHeight;
 
-  const zoom = Math.min(
-    vw / (active.w * vw),
-    vh / (active.h * vh)
-  );
+  canvas.style.left = (video.offsetLeft + window.regionE.x * vw) + "px";
+  canvas.style.top = (video.offsetTop + window.regionE.y * vh) + "px";
+  canvas.style.width = (window.regionE.w * vw) + "px";
+  canvas.style.height = (window.regionE.h * vh) + "px";
 
-  const tx = active.x * vw;
-  const ty = active.y * vh;
+  const dpr = window.devicePixelRatio || 1;
+  const bw = Math.max(1, Math.round(window.regionE.w * vw * dpr));
+  const bh = Math.max(1, Math.round(window.regionE.h * vh * dpr));
+  if (canvas.width !== bw || canvas.height !== bh) {
+    canvas.width = bw;
+    canvas.height = bh;
+  }
+}
 
-  video.style.transformOrigin = "top left";
 
-  video.style.transform = `
-    scale(${zoom})
-    translate(${-tx}px, ${-ty}px)
-  `;
+// Draw one composited frame: the active thumbnail region of the source video,
+// scaled to fit (aspect-preserving, centered) into the canvas over region E.
+function drawZoomFrame() {
+  if (!window.isZoomed) return;
 
-  console.log("Zooming to:", window.activeRectIndex, active);
+  const video = document.querySelector('video');
+  const canvas = window.zoomCanvas;
+  const ctx = window.zoomCtx;
+  const active = window.rects[window.activeRectIndex];
+
+  if (!video || !canvas || !ctx || !active || !video.videoWidth) {
+    scheduleZoomFrame(video);
+    return;
+  }
+
+  positionCanvasOverE(video, canvas);
+
+  // Source rect is in the video's intrinsic pixels.
+  const sx = active.x * video.videoWidth;
+  const sy = active.y * video.videoHeight;
+  const sw = active.w * video.videoWidth;
+  const sh = active.h * video.videoHeight;
+
+  // Fit the source region into the canvas (contain), centered.
+  const cw = canvas.width;
+  const ch = canvas.height;
+  const scale = Math.min(cw / sw, ch / sh);
+  const dw = sw * scale;
+  const dh = sh * scale;
+  const dx = (cw - dw) / 2;
+  const dy = (ch - dh) / 2;
+
+  ctx.fillStyle = "black";
+  ctx.fillRect(0, 0, cw, ch);
+  try {
+    ctx.drawImage(video, sx, sy, sw, sh, dx, dy, dw, dh);
+  } catch (err) {
+    // A SecurityError here means the video frame is protected (EME/DRM) and
+    // can't be read into a canvas. Bail out cleanly rather than looping on it.
+    console.warn("Pro Climbing Viewer: unable to draw video frame:", err);
+    resetZoom();
+    return;
+  }
+
+  scheduleZoomFrame(video);
+}
+
+
+// Schedule the next frame with requestVideoFrameCallback when available (fires
+// once per new video frame; Firefox 132+/Chrome), else requestAnimationFrame.
+function scheduleZoomFrame(video) {
+  if (!window.isZoomed) return;
+  if (video && typeof video.requestVideoFrameCallback === "function") {
+    window._zoomFrameKind = "rvfc";
+    window._zoomFrameHandle = video.requestVideoFrameCallback(() => drawZoomFrame());
+  } else {
+    window._zoomFrameKind = "raf";
+    window._zoomFrameHandle = requestAnimationFrame(() => drawZoomFrame());
+  }
+}
+
+
+function startZoomLoop() {
+  if (window._zoomLoopRunning) return;
+  window._zoomLoopRunning = true;
+  drawZoomFrame();
+}
+
+
+function stopZoomLoop() {
+  window._zoomLoopRunning = false;
+  const handle = window._zoomFrameHandle;
+  if (handle == null) return;
+
+  const video = document.querySelector('video');
+  if (window._zoomFrameKind === "rvfc" && video && video.cancelVideoFrameCallback) {
+    video.cancelVideoFrameCallback(handle);
+  } else if (window._zoomFrameKind === "raf") {
+    cancelAnimationFrame(handle);
+  }
+  window._zoomFrameHandle = null;
 }
 
 
