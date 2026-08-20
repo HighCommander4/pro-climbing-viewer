@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # Pro Climbing Viewer
 
 Zoom in on climbers during World Climbing boulder semifinals using keys 1–4.
