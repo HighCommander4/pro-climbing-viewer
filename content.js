@@ -22,6 +22,14 @@ window.regionD = { x: 0.5640625,            y: 0.07, w: 0.18802083333333333, h: 
 // element's box; calibrate to the actual broadcast layout if needed.
 window.regionE = { x: 0, y: 0.31, w: 0.745, h: 0.69 };
 
+// Region F: a small picture-in-picture inset, shown while zoomed, that keeps
+// displaying the content normally occupying region E (hidden behind the zoom).
+// Coordinates are in the SAME whole-video normalized units as the others (not
+// relative to E). F is drawn onto the region-E canvas, so any part of F that
+// extends beyond region E falls outside the canvas and is simply not rendered.
+// The default sits in the bottom-right corner of E; calibrate as needed.
+window.regionF = { x: 0.5, y: 0.773, w: 0.245, h: 0.227 };
+
 function addButton() {
   const rightControls = document.querySelector('.ytp-right-controls');
   if (!rightControls) return;
@@ -262,25 +270,37 @@ function drawZoomFrame() {
 
   positionCanvasOverE(video, canvas);
 
-  // Source rect is in the video's intrinsic pixels.
-  const sx = active.x * video.videoWidth;
-  const sy = active.y * video.videoHeight;
-  const sw = active.w * video.videoWidth;
-  const sh = active.h * video.videoHeight;
-
-  // Fit the source region into the canvas (contain), centered.
+  // Source rects are in the video's intrinsic pixels; the canvas maps region E
+  // to its full extent (0,0)..(cw,ch).
+  const vw = video.videoWidth;
+  const vh = video.videoHeight;
   const cw = canvas.width;
   const ch = canvas.height;
-  const scale = Math.min(cw / sw, ch / sh);
-  const dw = sw * scale;
-  const dh = sh * scale;
-  const dx = (cw - dw) / 2;
-  const dy = (ch - dh) / 2;
 
   ctx.fillStyle = "black";
   ctx.fillRect(0, 0, cw, ch);
   try {
-    ctx.drawImage(video, sx, sy, sw, sh, dx, dy, dw, dh);
+    // Main view: the active thumbnail (A–D), scaled to fill region E's canvas.
+    drawContainFit(ctx, video,
+      active.x * vw, active.y * vh, active.w * vw, active.h * vh,
+      0, 0, cw, ch);
+
+    // Picture-in-picture: the content normally occupying region E, drawn as a
+    // small inset over region F (on top of the zoomed view). regionF is in
+    // whole-video coordinates, so map it into the E-canvas's pixel space.
+    // Anything outside region E lands off-canvas and is clipped automatically.
+    const e = window.regionE;
+    const f = window.regionF;
+    const fx = (f.x - e.x) / e.w * cw;
+    const fy = (f.y - e.y) / e.h * ch;
+    const fw = f.w / e.w * cw;
+    const fh = f.h / e.h * ch;
+
+    ctx.fillStyle = "black";
+    ctx.fillRect(fx, fy, fw, fh);
+    drawContainFit(ctx, video,
+      e.x * vw, e.y * vh, e.w * vw, e.h * vh,
+      fx, fy, fw, fh);
   } catch (err) {
     // A SecurityError here means the video frame is protected (EME/DRM) and
     // can't be read into a canvas. Bail out cleanly rather than looping on it.
@@ -290,6 +310,18 @@ function drawZoomFrame() {
   }
 
   scheduleZoomFrame(video);
+}
+
+
+// Draw a source rect of the video (intrinsic px) into a destination box (canvas
+// px), scaled to fit (contain): aspect-preserving and centered within the box.
+function drawContainFit(ctx, video, sx, sy, sw, sh, boxX, boxY, boxW, boxH) {
+  const scale = Math.min(boxW / sw, boxH / sh);
+  const dw = sw * scale;
+  const dh = sh * scale;
+  const dx = boxX + (boxW - dw) / 2;
+  const dy = boxY + (boxH - dh) / 2;
+  ctx.drawImage(video, sx, sy, sw, sh, dx, dy, dw, dh);
 }
 
 
